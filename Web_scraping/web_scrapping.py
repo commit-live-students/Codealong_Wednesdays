@@ -1,117 +1,110 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Apr 30 17:27:15 2020
+Created on Sun May  3 10:01:48 2020
 
-@author: nnair
+@author: NNAIR
 """
 
-# WEB SCRAPING 101
-
-# Header files
+# Importing header files
 from selenium import webdriver
+import pandas as pd
 from selenium.webdriver.support.ui import WebDriverWait
-import pandas as pd    
 
 
+main_url="https://www.swiggy.com"
 
-# Function for searching cuisine
-
-def search_cuisine(cuisine_name):
-    
-    # Finding the search bar
-    search_item = driver.find_element_by_class_name("discover-search")
-    
-    #Input the cuisine
-    search_item.send_keys(cuisine_name)    
-    driver.find_element_by_id("search_button").click()
-    driver.find_element_by_id("search_button").click()
-
-    WebDriverWait(driver, 500).until(lambda driver: driver.find_element_by_class_name("close"))
-    driver.find_element_by_class_name("close").click()
-#    
-#    
-#    # Click on the search button
-    driver.find_element_by_id("search_button").click()
-
-    return    
-
-
-
-# URL to scrape
-main_url = "https://www.zomato.com"
-
-# Wait for the window to load
-
-
-# Launching the web driver
-driver = webdriver.Chrome()
+# Opening the web driver
+driver=webdriver.Chrome()
 
 driver.implicitly_wait(5)
 driver.maximize_window()
 
-
-# Open the URL
 driver.get(main_url)
 
-cuisine_name="Chinese"
 
-print("Searching for " + cuisine_name)
+# Setting the location for swiggy 
+city = 'Mumbai'
+search_item = driver.find_element_by_xpath("//*[@id='location']")
+search_item.send_keys(city)
+WebDriverWait(driver, 500).until(lambda driver: driver.find_element_by_xpath("//*[@class='_2W-T9']"))
+cityname = driver.find_element_by_xpath("//*[@class='_2W-T9']")
+cityname.click()
 
-# Calling the function
-search_cuisine(cuisine_name)
-
-# Waiting for elements to load
-WebDriverWait(driver, 10).until(lambda driver: driver.find_element_by_xpath("//*[@class='result-title hover_feedback zred bold ln24   fontsize0 ']"))
-
-# Storing the results in a list
-listings = driver.find_elements_by_xpath("//*[@class='result-title hover_feedback zred bold ln24   fontsize0 ']")
+# Wait for swiggy.com/restaurnts link to validate location
+WebDriverWait(driver,100).until(lambda driver: driver.find_element_by_xpath("//*[@class='_3XX_A']"))
 
 
-# Creating an empty dataframe to store scraped data
-df = pd.DataFrame(columns=['Name','cuisine','rating','location','url'])
+# Initialising dataframe
+df = pd.DataFrame(columns=['restaurant name','cuisine','rating','price for two','location','url'])
 
-# Storing the current window
-current_window = driver.current_window_handle
 
-for listing in listings: 
+# Initialsing cuisine options
+cuisine_options=["chinese","north indian thalis","italian"]
+
+
+# Running a loop across the options
+for cuisine in cuisine_options:
     
-    # Get the link of restaurant page
-    url=listing.get_attribute('href') 
+    # Opening cuisine specific URL
+    search_url="https://www.swiggy.com/search?q=" + "+".join(str(ci) for ci in cuisine.split())
+    driver.get(search_url) 
+    
+    # Getting all the search result links
+    listings=driver.find_elements_by_xpath("//*[@class='_3XX_A']/a")
+    current_window=driver.current_window_handle
+    
+    
+    for listing in listings:
+        
+        # Getting restaurant URL
+        url=listing.get_attribute('href')
+        
+        # Opening the restaurant url
+        driver.execute_script('window.open(arguments[0]);',url)
+        new_window= driver.window_handles[1]
+        driver.switch_to.window(new_window)
 
-    # Open the URL in a new window                         
-    driver.execute_script('window.open(arguments[0]);', url)
-    new_window=driver.window_handles[1]
-    driver.switch_to.window(new_window)
-    
-    # Storing restaurant name  
-    WebDriverWait(driver, 500).until(lambda driver: driver.find_element_by_xpath("//h1[@class='sc-7kepeu-0 sc-ivVeuv kBFhIT']").text)
-    rest_name=driver.find_element_by_xpath("//h1[@class='sc-7kepeu-0 sc-ivVeuv kBFhIT']").text
-    
-    # Storing restaurant cuisine
-    WebDriverWait(driver, 100).until(lambda driver: driver.find_elements_by_xpath("//*[@class='sc-hdPSEv kBGNIy']"))
-    rest_cuisine=driver.find_elements_by_xpath("//*[@class='sc-hdPSEv kBGNIy']")
-    
-    cuisine_list= []
-    for cuisine in rest_cuisine:
-        cuisine_list.append(cuisine.text)
-    
-    # Storing restaurant rating
-    WebDriverWait(driver, 100).until(lambda driver: driver.find_element_by_xpath("//*[@class='sc-cgHJcJ jzevHZ']"))
-    rest_rating=driver.find_element_by_xpath("//*[@class='sc-cgHJcJ jzevHZ']").text[0]
-    
-    # Storing restaurant location
-    WebDriverWait(driver, 100).until(lambda driver: driver.find_element_by_xpath("//*[@class='sc-cmIlrE kbEObq']"))
-    rest_location=driver.find_element_by_xpath("//*[@class='sc-cmIlrE kbEObq']").text
-    
-    # Storing the data in dataframe
-    df = df.append({'Name': rest_name,'cuisine': cuisine_list,'location':rest_location, 'rating':rest_rating,'url':url}, ignore_index=True)   
+        # Getting restaurant name
+        rest_name=driver.find_element_by_xpath("//*[@class='_3aqeL']").text
+        
+        # Getting restaurant cuisines
+        cuisine_list=driver.find_element_by_xpath("//*[@class='_3Plw0 JMACF']").text
+        print(cuisine_list)
+        
 
-    driver.close()
-    
-    # Switching to main window
-    driver.switch_to.window(current_window)
-    
-  
-# Storing the dataframe in a CSV file          
-df.to_csv("Zomato_data.csv")
+        # Getting restaurant rating        
+        rest_rating=driver.find_elements_by_xpath("//*[@class='_2l3H5']")[0].text
+        print(rest_rating)
+        
+        # Getting restaurant price
+        rest_price=driver.find_elements_by_xpath("//*[@class='_2l3H5']")[2].text
+        print(rest_price)
+        
+        
+        # Getting restaurant location
+        try:
+            rest_location=driver.find_element_by_xpath("//*[@class='Gf2NS _2Y6HW']").text
+        except:
+            rest_location=driver.find_element_by_xpath("//*[@class='Gf2NS _2Y6HW _2x0-U']").text
 
+        # Adding elements to dataframe
+        df = df.append({'restaurant name': rest_name,'cuisine': cuisine_list,'rating':rest_rating,'price for two':rest_price,'location':rest_location, 'url':url}, ignore_index=True)
+
+        # Setting up the size of each cuisine
+        if(len(df)%5==0):
+            
+            driver.close()
+            driver.switch_to.window(current_window)
+            break
+                
+            
+        # Closing the restaurant URL    
+        driver.close()
+        driver.switch_to.window(current_window)
+
+# Closing the main driver    
+driver.close()
+
+
+# Saving the data into a csv file
+df.to_csv("Swiggy_data.csv",index=False) 
